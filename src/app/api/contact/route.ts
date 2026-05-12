@@ -1,10 +1,72 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
+// ইন-মেমোরি রেট লিমিট ট্র্যাকার (IP -> { count, lastReset })
+const rateLimiter = new Map<string, { count: number; lastReset: number }>();
+
+// রেট লিমিট কনফিগারেশন: ১ মিনিটে সর্বোচ্চ ৩ বার রিকোয়েস্ট
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; 
+const MAX_REQUESTS_PER_WINDOW = 3;
+
 export async function POST(request: Request) {
   try {
+    // ১. ইউজারের IP অ্যাড্রেস বের করা
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : 'unknown-ip';
+
+    // ২. রেট লিমিটিং লজিক
+    const now = Date.now();
+    const userRate = rateLimiter.get(ip);
+
+    if (userRate) {
+      if (now - userRate.lastReset < RATE_LIMIT_WINDOW_MS) {
+        if (userRate.count >= MAX_REQUESTS_PER_WINDOW) {
+          return NextResponse.json(
+            { success: false, message: 'অতিরিক্ত রিকোয়েস্ট পাঠানো হয়েছে। দয়া করে ১ মিনিট পর আবার চেষ্টা করুন।' },
+            { status: 429 }
+          );
+        }
+        userRate.count += 1;
+      } else {
+        rateLimiter.set(ip, { count: 1, lastReset: now });
+      }
+    } else {
+      rateLimiter.set(ip, { count: 1, lastReset: now });
+    }
+
     const { name, email, inquiry_type, message, token } = await request.json();
 
+    // ৩. কাস্টম ইনপুট ভ্যালিডেশন (আলাদা ক্যারেক্টার লিমিট চেক)
+    const trimmedName = name?.trim() || '';
+    const trimmedEmail = email?.trim() || '';
+    const trimmedMessage = message?.trim() || '';
+
+    // নামের ভ্যালিডেশন (২ - ৬০ ক্যারেক্টার)
+    if (trimmedName.length < 2 || trimmedName.length > 60) {
+      return NextResponse.json(
+        { success: false, message: 'নাম কমপক্ষে ২ থেকে ৬০ অক্ষরের মধ্যে হতে হবে।' },
+        { status: 400 }
+      );
+    }
+
+    // ইমেইল ভ্যালিডেশন (৫ - ১০০ ক্যারেক্টার এবং সঠিক ফরম্যাট)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (trimmedEmail.length < 5 || trimmedEmail.length > 100 || !emailRegex.test(trimmedEmail)) {
+      return NextResponse.json(
+        { success: false, message: 'দয়া করে একটি সঠিক ইমেইল অ্যাড্রেস প্রদান করুন।' },
+        { status: 400 }
+      );
+    }
+
+    // মেসেজ ভ্যালিডেশন (১০ - ২০০০ ক্যারেক্টার)
+    if (trimmedMessage.length < 10 || trimmedMessage.length > 2000) {
+      return NextResponse.json(
+        { success: false, message: 'মেসেজ কমপক্ষে ১০ থেকে ২০০০ অক্ষরের মধ্যে হতে হবে।' },
+        { status: 400 }
+      );
+    }
+
+    // টোকেন চেক
     if (!token) {
       return NextResponse.json(
         { success: false, message: 'Security token is missing.' }, 
@@ -12,7 +74,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cloudflare Turnstile ভেরিফিকেশন
+    // ৪. Cloudflare Turnstile ভেরিফিকেশন
     const verifyFormData = new FormData();
     verifyFormData.append('secret', process.env.TURNSTILE_SECRET_KEY!);
     verifyFormData.append('response', token);
@@ -31,7 +93,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Nodemailer কনফিগারেশন
+    // ৫. Nodemailer কনফিগারেশন ও ইমেইল প্রেরণ
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -40,21 +102,20 @@ export async function POST(request: Request) {
       },
     });
 
-    // ইমেইল টেমপ্লেট
     const mailOptions = {
       from: process.env.GMAIL_USER, 
       to: process.env.GMAIL_USER,   
-      replyTo: email, 
-      subject: `[${inquiry_type}] Inquiry from ${name}`,
+      replyTo: trimmedEmail, 
+      subject: `[${inquiry_type || 'General'}] Inquiry from ${trimmedName}`,
       html: `
         <div style="font-family: sans-serif; padding: 20px; color: #333;">
           <h2>New Website Contact Message</h2>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Reason:</strong> ${inquiry_type}</p>
+          <p><strong>Name:</strong> ${trimmedName}</p>
+          <p><strong>Email:</strong> ${trimmedEmail}</p>
+          <p><strong>Reason:</strong> ${inquiry_type || 'N/A'}</p>
           <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;"/>
           <p><strong>Message:</strong></p>
-          <p style="white-space: pre-wrap; background: #f9f9f9; padding: 15px; border-left: 4px solid #dc2626; border-radius: 4px;">${message}</p>
+          <p style="white-space: pre-wrap; background: #f9f9f9; padding: 15px; border-left: 4px solid #dc2626; border-radius: 4px;">${trimmedMessage}</p>
         </div>
       `,
     };

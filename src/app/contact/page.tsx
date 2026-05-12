@@ -50,71 +50,61 @@ export default function ContactPage() {
           />
 
           <div className="mt-2 grid grid-cols-1 gap-6 lg:grid-cols-[0.92fr_1.08fr] md:mt-8">
-            <section className="horror-card relative order-2 overflow-hidden rounded-2xl p-5 md:rounded-3xl md:p-10 lg:order-1">
+            {/* বাম পাশের ইনফো সেকশন - অত্যন্ত কম্প্যাক্ট ও প্রফেশনাল করা হয়েছে */}
+            <section className="horror-card relative order-2 flex flex-col justify-between overflow-hidden rounded-2xl p-6 md:rounded-3xl md:p-8 lg:order-1">
               <div className="absolute right-[-70px] top-[-70px] h-44 w-44 rounded-full bg-red-600/15 blur-[90px]" />
 
               <div className="relative z-10">
-                <div className="mb-4 grid h-12 w-12 place-items-center rounded-xl border border-red-500/25 bg-red-500/10 text-red-400 md:mb-6 md:h-16 md:w-16 md:rounded-2xl">
-                  <Mail className="h-6 w-6 md:h-8 md:w-8" />
+                <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-red-500/25 bg-red-500/10 text-red-400 md:mb-5 md:h-14 md:w-14">
+                  <Mail className="h-5 w-5 md:h-7 md:w-7" />
                 </div>
 
-                <h1 className="mb-3 text-2xl font-black leading-tight text-white md:text-4xl">
+                <h1 className="mb-3 text-2xl font-black leading-tight text-white md:text-3xl">
                   Let&apos;s Work Together
                 </h1>
 
-                <p className="mb-6 text-[15px] leading-relaxed text-slate-400 md:text-base md:leading-8">
+                <p className="mb-6 text-sm leading-relaxed text-slate-400 md:text-[15px]">
                   রঙতুলি অ্যানিমেশন মূলত হরর, রহস্য এবং সিনেমাটিক গল্প নিয়ে কাজ করে। আমাদের চ্যানেলের মাধ্যমে আপনার ব্র্যান্ড প্রমোশন বা কোনো কোলাবোরেশন করতে চাইলে সরাসরি মেইল করুন বা ফর্মটি পূরণ করুন।
                 </p>
 
-                <div className="mb-5 rounded-xl border border-white/10 bg-black/35 p-4 md:rounded-2xl md:p-5">
-                  <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Business Email
-                  </p>
-
-                  <a
-                    href={`mailto:${siteConfig.businessEmail}`}
-                    className="break-all text-base font-bold text-white transition hover:text-red-300 md:text-xl"
-                  >
-                    {siteConfig.businessEmail}
-                  </a>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:gap-4">
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:rounded-2xl md:p-5">
-                    <div className="mb-2 flex items-center gap-2 text-red-300 md:mb-3">
-                      <ShieldCheck className="h-4 w-4 md:h-5 md:w-5" />
-                      <h2 className="text-[15px] font-bold text-white md:text-base">Professional Inquiry</h2>
+                {/* কম্প্যাক্ট ফিচার লিস্ট (পাবলিক ইমেইল টেক্সট হাইড করা হয়েছে) */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3.5 transition hover:bg-white/[0.04]">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-red-400 md:h-5 md:w-5" />
+                    <div>
+                      <h2 className="text-xs font-bold text-white md:text-sm">Professional Inquiry</h2>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400 md:text-xs">
+                        স্পন্সরশিপ, পেইড প্রমোশন বা কোলাবোরেশনের জন্য সরাসরি যোগাযোগ করুন।
+                      </p>
                     </div>
-                    <p className="text-sm leading-relaxed text-slate-400 md:leading-7">
-                      স্পন্সরশিপ, পেইড প্রমোশন, কোলাবোরেশন বা ইউটিউব সম্পর্কিত যেকোনো ব্যবসায়িক আলোচনার জন্য মেইল করতে পারেন।
-                    </p>
                   </div>
 
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:rounded-2xl md:p-5">
-                    <div className="mb-2 flex items-center gap-2 text-red-300 md:mb-3">
-                      <Sparkles className="h-4 w-4 md:h-5 md:w-5" />
-                      <h2 className="text-[15px] font-bold text-white md:text-base">Quick Response</h2>
+                  <div className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3.5 transition hover:bg-white/[0.04]">
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-red-400 md:h-5 md:w-5" />
+                    <div>
+                      <h2 className="text-xs font-bold text-white md:text-sm">Quick Response</h2>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400 md:text-xs">
+                        প্রপোজালের বিস্তারিত ও সুনির্দিষ্ট তথ্য লিখে পাঠালে দ্রুত রেসপন্স পেতে সুবিধা হয়।
+                      </p>
                     </div>
-                    <p className="text-sm leading-relaxed text-slate-400 md:leading-7">
-                      আপনার মেসেজটি সুনির্দিষ্ট হলে আমাদের উত্তর দিতে সুবিধা হয়। প্রপোজালের বিস্তারিত লিখে পাঠালে ভালো।
-                    </p>
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row md:mt-8 md:gap-4">
-                  <CTAButton href={siteConfig.youtubeChannelUrl} external variant="outline">
-                    <MonitorPlay className="mr-2 h-4 w-4" />
-                    Visit Channel
-                  </CTAButton>
+              {/* অ্যাকশন বাটনসমূহ (সরাসরি মেইল টু অ্যাড করা হয়েছে) */}
+              <div className="relative z-10 mt-6 flex flex-col gap-3 sm:flex-row md:mt-8">
+                <CTAButton href={siteConfig.youtubeChannelUrl} external variant="outline">
+                  <MonitorPlay className="mr-2 h-4 w-4" />
+                  Visit Channel
+                </CTAButton>
 
-                  <CTAButton href={`mailto:${siteConfig.businessEmail}`} external>
-                    Send Email
-                  </CTAButton>
-                </div>
+                <CTAButton href="mailto:rangtulianimation@gmail.com" external>
+                  Send Email
+                </CTAButton>
               </div>
             </section>
 
-            {/* ফর্মের অংশটুকু আলাদা ক্লায়েন্ট কম্পোনেন্ট থেকে রেন্ডার হচ্ছে */}
+            {/* ডান পাশের কন্টাক্ট ফর্ম সেকশন */}
             <ContactForm />
           </div>
         </div>
