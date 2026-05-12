@@ -1,10 +1,6 @@
 import { adminDb } from "@/lib/firebaseAdmin";
 import { YouTubeApiResponse, Episode } from "@/types/youtube";
 
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
-const YOUTUBE_PLAYLIST_ID = process.env.YOUTUBE_PLAYLIST_ID;
-const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
-
 export function createSlug(title: string) {
   return title
     .toLowerCase()
@@ -26,18 +22,25 @@ async function getSavedEpisode(videoId: string): Promise<Partial<Episode> | null
 }
 
 export async function getMostViewedVideo(): Promise<Episode | null> {
-  if (!YOUTUBE_API_KEY || !YOUTUBE_CHANNEL_ID) return null;
+  // Environment Variable গুলো ফাংশনের ভেতরে আনা হয়েছে
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  const channelId = process.env.YOUTUBE_CHANNEL_ID;
+
+  if (!apiKey || !channelId) {
+    console.error("Missing YOUTUBE_API_KEY or YOUTUBE_CHANNEL_ID");
+    return null;
+  }
 
   try {
     const url = new URL("https://www.googleapis.com/youtube/v3/search");
     url.searchParams.append("part", "snippet");
-    url.searchParams.append("channelId", YOUTUBE_CHANNEL_ID);
+    url.searchParams.append("channelId", channelId);
     url.searchParams.append("order", "viewCount");
     url.searchParams.append("maxResults", "1");
     url.searchParams.append("type", "video");
-    url.searchParams.append("key", YOUTUBE_API_KEY);
+    url.searchParams.append("key", apiKey);
 
-    const response = await fetch(url.toString(), { next: { revalidate: 86400 } });
+    const response = await fetch(url.toString(), { next: { revalidate: 3600 } });
     const data = await response.json();
 
     if (!data.items || data.items.length === 0) return null;
@@ -74,14 +77,21 @@ export async function getMostViewedVideo(): Promise<Episode | null> {
 }
 
 export async function getLatestVideos(maxResults: number = 6): Promise<Episode[]> {
-  if (!YOUTUBE_API_KEY || !YOUTUBE_PLAYLIST_ID) return [];
+  // Environment Variable গুলো ফাংশনের ভেতরে আনা হয়েছে
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  const playlistId = process.env.YOUTUBE_PLAYLIST_ID;
+
+  if (!apiKey || !playlistId) {
+    console.error("Missing YOUTUBE_API_KEY or YOUTUBE_PLAYLIST_ID");
+    return [];
+  }
 
   try {
     const url = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
     url.searchParams.append("part", "snippet");
-    url.searchParams.append("playlistId", YOUTUBE_PLAYLIST_ID);
+    url.searchParams.append("playlistId", playlistId);
     url.searchParams.append("maxResults", maxResults.toString());
-    url.searchParams.append("key", YOUTUBE_API_KEY);
+    url.searchParams.append("key", apiKey);
 
     const response = await fetch(url.toString(), { next: { revalidate: 3600 } });
     const data = await response.json();
