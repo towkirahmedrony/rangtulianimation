@@ -5,22 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// ডেট ফরম্যাটকে প্রফেশনাল (Sep 16, 2025) করা হলো
 export function formatDate(dateString: string) {
   const date = new Date(dateString);
 
   if (Number.isNaN(date.getTime())) {
-    return "";
+    return dateString;
   }
 
-  return new Intl.DateTimeFormat("bn-BD", {
+  return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
   }).format(date);
 }
 
-export function formatNumber(value: number) {
-  return new Intl.NumberFormat("bn-BD").format(value);
+// নাম্বারে কমা (102,639) যুক্ত করার ফাংশন
+export function formatNumber(value: number | string) {
+  const num = typeof value === "string" ? Number(value) : value;
+  if (isNaN(num)) return value;
+  
+  return new Intl.NumberFormat("en-US").format(num);
 }
 
 export function truncateText(text: string, maxLength = 120) {

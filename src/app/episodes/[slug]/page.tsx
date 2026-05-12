@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { siteConfig } from "@/config/site";
+import { formatDate, formatNumber } from "@/lib/utils";
+import { Youtube } from "lucide-react";
 
 type Episode = {
   id?: string;
@@ -28,7 +30,6 @@ type PageProps = {
   }>;
 };
 
-// getBaseUrl ফাংশনটিকে ঠিক করা হয়েছে
 function getBaseUrl() {
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return process.env.NEXT_PUBLIC_SITE_URL;
@@ -65,7 +66,6 @@ async function getEpisodes(): Promise<Episode[]> {
   try {
     const baseUrl = getBaseUrl();
 
-    // Debugging এর জন্য একটি লগ যোগ করা হলো
     console.log(`Fetching from: ${baseUrl}/api/episodes`);
 
     const res = await fetch(`${baseUrl}/api/episodes`, {
@@ -102,7 +102,6 @@ async function getEpisodes(): Promise<Episode[]> {
 
 async function getEpisodeBySlug(slug: string) {
   const episodes = await getEpisodes();
-
   const episode = episodes.find((item) => getEpisodeSlug(item) === slug);
 
   return {
@@ -266,6 +265,7 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500"
                 >
+                  <Youtube className="mr-2 h-5 w-5" />
                   Watch on YouTube
                 </a>
 
@@ -277,30 +277,30 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
                 </Link>
               </div>
 
-              <div className="mt-6 space-y-3 border-t border-white/10 pt-5 text-sm text-slate-400">
+              {/* ডেট এবং ভিউ সেকশন আপডেট করা হলো */}
+              <div className="mt-6 flex flex-wrap items-center gap-6 border-t border-white/10 pt-5 text-sm text-slate-400">
                 {publishedDate ? (
                   <p>
-                    <span className="text-slate-200">Published:</span>{" "}
-                    {typeof publishedDate === "string"
-                      ? publishedDate
-                      : new Date(publishedDate).toLocaleDateString("en-US")}
+                    <span className="font-semibold text-slate-200">Published:</span>{" "}
+                    {formatDate(publishedDate.toString())}
                   </p>
                 ) : null}
 
                 {episode.viewCount ? (
                   <p>
-                    <span className="text-slate-200">Views:</span>{" "}
-                    {episode.viewCount}
+                    <span className="font-semibold text-slate-200">Views:</span>{" "}
+                    {formatNumber(episode.viewCount)}
                   </p>
                 ) : null}
               </div>
 
+              {/* ট্যাগ সেকশন আপডেট করা হলো */}
               {episode.tags && episode.tags.length > 0 ? (
                 <div className="mt-5 flex flex-wrap gap-2">
                   {episode.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300"
+                      className="rounded-full border border-slate-700/60 bg-slate-800/40 px-3 py-1.5 text-xs font-medium text-slate-300 shadow-sm backdrop-blur-sm transition-colors hover:bg-slate-700/80 hover:text-white"
                     >
                       #{tag}
                     </span>
