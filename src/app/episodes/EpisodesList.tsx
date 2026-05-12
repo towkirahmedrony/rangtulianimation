@@ -9,12 +9,17 @@ export default function EpisodesList({ initialVideos }: { initialVideos: Episode
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredVideos = initialVideos.filter((video) => {
+    // ফিক্স ১: সার্চ বক্স খালি থাকলে সব ভিডিও দেখাবে
+    if (!searchQuery.trim()) return true;
+
     const query = searchQuery.toLowerCase();
-    return (
-      video.title?.toLowerCase().includes(query) ||
-      video.description?.toLowerCase().includes(query) ||
-      video.tags?.some(tag => tag.toLowerCase().includes(query))
-    );
+    
+    // ফিক্স ২: সেফটি চেক (যাতে কোনো ডাটা মিসিং থাকলেও ক্র্যাশ না করে)
+    const titleMatch = video.title?.toLowerCase().includes(query) || false;
+    const descMatch = video.description?.toLowerCase().includes(query) || false;
+    const tagMatch = video.tags?.some(tag => tag.toLowerCase().includes(query)) || false;
+
+    return titleMatch || descMatch || tagMatch;
   });
 
   return (
@@ -25,7 +30,7 @@ export default function EpisodesList({ initialVideos }: { initialVideos: Episode
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 mt-4">
           {filteredVideos.map((video) => (
             <EpisodeCard 
-              key={video.id} 
+              key={video.id || video.videoId} 
               title={video.title}
               description={video.description}
               thumbnail={video.thumbnail}
