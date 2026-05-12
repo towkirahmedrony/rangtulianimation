@@ -1,17 +1,15 @@
 import { Metadata } from "next";
 import {
   Mail,
-  MessageSquare,
   MonitorPlay,
-  Send,
   ShieldCheck,
   Sparkles,
-  User,
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import Container from "@/components/ui/Container";
 import SectionHeader from "@/components/ui/SectionHeader";
 import CTAButton from "@/components/ui/CTAButton";
+import ContactForm from "./ContactForm";
 
 export const metadata: Metadata = {
   title: `Contact | ${siteConfig.name} - Sponsorship & Collaboration`,
@@ -36,8 +34,6 @@ export const metadata: Metadata = {
     locale: "bn_BD",
   },
 };
-
-const formspreeEndpoint = "https://formspree.io/f/xovlrnbz";
 
 export default function ContactPage() {
   return (
@@ -118,140 +114,8 @@ export default function ContactPage() {
               </div>
             </section>
 
-            <section className="horror-card order-1 rounded-2xl p-5 md:rounded-3xl md:p-10 lg:order-2">
-              <div className="mb-6 md:mb-8">
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-red-500 md:mb-3">
-                  Send Message
-                </p>
-
-                <h2 className="mb-2 text-2xl font-black text-white md:mb-3 md:text-3xl">
-                  যোগাযোগ ফর্ম
-                </h2>
-
-                <p className="text-sm leading-relaxed text-slate-400 md:text-base md:leading-7">
-                  নিচের ফর্মটি পূরণ করে মেসেজ পাঠান। এটি সরাসরি আমাদের ইমেইলে চলে আসবে।
-                </p>
-              </div>
-
-              <form action={formspreeEndpoint} method="POST" className="space-y-4 md:space-y-5">
-                <input
-                  type="text"
-                  name="_gotcha"
-                  className="hidden"
-                  tabIndex={-1}
-                  autoComplete="off"
-                />
-
-                <input
-                  type="hidden"
-                  name="_subject"
-                  value={`${siteConfig.name} Website Contact Form Message`}
-                />
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
-                  <div>
-                    <label
-                      htmlFor="name"
-                      className="mb-1.5 block text-xs font-semibold text-slate-200 md:mb-2 md:text-sm"
-                    >
-                      আপনার নাম
-                    </label>
-
-                    <div className="relative">
-                      <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                      <input
-                        id="name"
-                        name="name"
-                        type="text"
-                        required
-                        placeholder="আপনার নাম লিখুন"
-                        className="w-full rounded-xl border border-white/10 bg-black/35 py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-red-500/60 focus:bg-black/50 md:rounded-2xl md:py-4 md:pl-11"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="mb-1.5 block text-xs font-semibold text-slate-200 md:mb-2 md:text-sm"
-                    >
-                      ইমেইল অ্যাড্রেস
-                    </label>
-
-                    <div className="relative">
-                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        required
-                        placeholder="your@email.com"
-                        className="w-full rounded-xl border border-white/10 bg-black/35 py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-red-500/60 focus:bg-black/50 md:rounded-2xl md:py-4 md:pl-11"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="inquiryType"
-                    className="mb-1.5 block text-xs font-semibold text-slate-200 md:mb-2 md:text-sm"
-                  >
-                    যোগাযোগের কারণ
-                  </label>
-
-                  <select
-                    id="inquiryType"
-                    name="inquiry_type"
-                    required
-                    defaultValue=""
-                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-3 text-sm text-white outline-none transition focus:border-red-500/60 focus:bg-black/50 md:rounded-2xl md:px-4 md:py-4"
-                  >
-                    <option value="" disabled>
-                      কী বিষয়ে যোগাযোগ করছেন?
-                    </option>
-                    <option value="Sponsorship">Sponsorship</option>
-                    <option value="Collaboration">Collaboration</option>
-                    <option value="Brand Promotion">Brand Promotion</option>
-                    <option value="Animation Project">Animation Project</option>
-                    <option value="General Inquiry">General Inquiry</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="message"
-                    className="mb-1.5 block text-xs font-semibold text-slate-200 md:mb-2 md:text-sm"
-                  >
-                    মেসেজ
-                  </label>
-
-                  <div className="relative">
-                    <MessageSquare className="pointer-events-none absolute left-3.5 top-4 h-4 w-4 text-slate-500 md:left-4 md:top-5" />
-                    <textarea
-                      id="message"
-                      name="message"
-                      required
-                      rows={5}
-                      placeholder="আপনার মেসেজটি বিস্তারিত লিখুন..."
-                      className="w-full resize-none rounded-xl border border-white/10 bg-black/35 py-3 pl-10 pr-4 text-sm leading-relaxed text-white outline-none transition placeholder:text-slate-600 focus:border-red-500/60 focus:bg-black/50 md:rounded-2xl md:py-4 md:pl-11 md:leading-7"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="group inline-flex w-full items-center justify-center rounded-xl border border-red-500/40 bg-red-700 px-5 py-3.5 text-sm font-black text-white shadow-[0_0_24px_rgba(220,38,38,0.28)] transition duration-300 hover:-translate-y-0.5 hover:bg-red-600 hover:shadow-[0_0_34px_rgba(220,38,38,0.45)] md:rounded-2xl md:px-6 md:py-4"
-                >
-                  মেসেজ পাঠান
-                  <Send className="ml-2 h-4 w-4 transition group-hover:translate-x-0.5" />
-                </button>
-
-                <p className="text-center text-[11px] leading-relaxed text-slate-500 md:text-xs md:leading-6">
-                  সাবমিট করলে ফর্মস্প্রি (Formspree) এর মাধ্যমে মেসেজটি আমাদের ইমেইলে চলে আসবে।
-                </p>
-              </form>
-            </section>
+            {/* ফর্মের অংশটুকু আলাদা ক্লায়েন্ট কম্পোনেন্ট থেকে রেন্ডার হচ্ছে */}
+            <ContactForm />
           </div>
         </div>
       </Container>
