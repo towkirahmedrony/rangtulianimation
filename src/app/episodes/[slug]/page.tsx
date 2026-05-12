@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { siteConfig } from "@/config/site";
 import { formatDate, formatNumber } from "@/lib/utils";
-import { Youtube } from "lucide-react";
 
 type Episode = {
   id?: string;
@@ -265,7 +264,14 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500"
                 >
-                  <Youtube className="mr-2 h-5 w-5" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="mr-2 h-5 w-5"
+                  >
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                  </svg>
                   Watch on YouTube
                 </a>
 
@@ -277,7 +283,6 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
                 </Link>
               </div>
 
-              {/* ডেট এবং ভিউ সেকশন আপডেট করা হলো */}
               <div className="mt-6 flex flex-wrap items-center gap-6 border-t border-white/10 pt-5 text-sm text-slate-400">
                 {publishedDate ? (
                   <p>
@@ -294,7 +299,6 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
                 ) : null}
               </div>
 
-              {/* ট্যাগ সেকশন আপডেট করা হলো */}
               {episode.tags && episode.tags.length > 0 ? (
                 <div className="mt-5 flex flex-wrap gap-2">
                   {episode.tags.map((tag) => (
