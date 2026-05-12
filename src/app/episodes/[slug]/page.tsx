@@ -28,15 +28,15 @@ type PageProps = {
   }>;
 };
 
+// getBaseUrl ফাংশনটিকে ঠিক করা হয়েছে
 function getBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.VERCEL_URL?.startsWith("http")
-      ? process.env.VERCEL_URL
-      : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000"
-  );
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return "http://localhost:3000";
 }
 
 function createSlug(text: string) {
@@ -65,6 +65,9 @@ async function getEpisodes(): Promise<Episode[]> {
   try {
     const baseUrl = getBaseUrl();
 
+    // Debugging এর জন্য একটি লগ যোগ করা হলো
+    console.log(`Fetching from: ${baseUrl}/api/episodes`);
+
     const res = await fetch(`${baseUrl}/api/episodes`, {
       next: {
         revalidate: 3600,
@@ -72,6 +75,7 @@ async function getEpisodes(): Promise<Episode[]> {
     });
 
     if (!res.ok) {
+      console.error("API response was not OK in details page. Status:", res.status);
       return [];
     }
 
@@ -90,7 +94,8 @@ async function getEpisodes(): Promise<Episode[]> {
     }
 
     return [];
-  } catch {
+  } catch (error) {
+    console.error("Error fetching episodes in details page:", error);
     return [];
   }
 }
