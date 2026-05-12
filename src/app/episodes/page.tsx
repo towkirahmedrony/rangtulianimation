@@ -1,18 +1,17 @@
-export const revalidate = 60;
 import { Metadata } from "next";
 import { siteConfig } from "@/config/site";
 import Container from "@/components/ui/Container";
-import EpisodeCard from "@/components/ui/EpisodeCard";
 import CTAButton from "@/components/ui/CTAButton";
 import { MonitorPlay } from "lucide-react";
 import { Episode } from "@/types/youtube";
+import EpisodesList from "./EpisodesList";
 
 export const metadata: Metadata = {
-  title: "Episodes",
+  title: "Episodes | Rang Tuli",
   description: "রঙতুলি অ্যানিমেশনের সব ভিডিও এক জায়গায় দেখুন।",
 };
 
-export const revalidate = 3600;
+export const revalidate = 60; // প্রতি ৬০ সেকেন্ডে ক্যাশ আপডেট
 
 async function getEpisodes(): Promise<Episode[]> {
   try {
@@ -20,7 +19,7 @@ async function getEpisodes(): Promise<Episode[]> {
                    (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://your-domain.com');
 
     const res = await fetch(`${baseUrl}/api/episodes`, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 60 },
     });
     
     if (!res.ok) {
@@ -43,8 +42,8 @@ export default async function EpisodesPage() {
     <div className="py-10 md:py-20">
       <Container>
         {/* Header Section with Integrated CTA */}
-        <div className="text-center mb-10">
-          <h1 className="text-3xl md:text-5xl font-bold mb-3">Episodes</h1>
+        <div className="text-center mb-8">
+          <h1 className="text-3xl md:text-5xl font-bold mb-3 text-white">Episodes</h1>
           <p className="text-slate-400 mb-6 max-w-2xl mx-auto">
             রঙতুলি অ্যানিমেশনের সব ভিডিও এক জায়গায় দেখুন।
           </p>
@@ -56,20 +55,9 @@ export default async function EpisodesPage() {
           </div>
         </div>
 
+        {/* সার্চ এবং গ্রিড লিস্ট */}
         {videos.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-            {videos.map((video) => (
-              <EpisodeCard 
-                key={video.id} 
-                title={video.title}
-                description={video.description}
-                thumbnail={video.thumbnail}
-                slug={video.slug}
-                youtubeUrl={video.youtubeUrl}
-                publishedAt={video.publishedAt}
-              />
-            ))}
-          </div>
+          <EpisodesList initialVideos={videos} />
         ) : (
           <div className="max-w-4xl mx-auto text-center space-y-6 py-16">
             <p className="text-slate-500 text-sm">ভিডিও লোড করা যাচ্ছে না। দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।</p>
