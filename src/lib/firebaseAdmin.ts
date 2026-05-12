@@ -1,7 +1,8 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
 
-const firebasePrivateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+// \n এবং ইনভার্টেড কমা (") রিমুভ করার জন্য আপডেট করা হয়েছে
+const firebasePrivateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n").replace(/"/g, "");
 
 if (!getApps().length) {
   initializeApp({
