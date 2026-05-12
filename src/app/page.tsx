@@ -1,3 +1,4 @@
+export const revalidate = 60;
 import { getLatestVideos, getMostViewedVideo } from "@/lib/youtube";
 import HeroSection from "@/components/home/HeroSection";
 import PopularEpisodeSection from "@/components/home/PopularEpisodeSection";

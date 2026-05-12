@@ -55,106 +55,39 @@ function getPrompt(input: { title: string; youtubeDescription?: string; transcri
 Video title:
 ${input.title}
 
-YouTube description (Ignore generic social links):
+YouTube description:
 ${input.youtubeDescription || ""}
 
-Video Transcript / Story Content (CRITICAL FOR STORY CONTEXT):
-${input.transcript || "No transcript available. Base the story mostly on the title."}
+Video Transcript:
+${input.transcript || "No transcript available."}
 
 Important context:
 - Channel type: Bengali / Bangla horror cartoon story
-- Audience: Bengali adult horror cartoon viewers
-- Goal: Website episode page, Google SEO, YouTube audience conversion
-- Tone: suspenseful, cinematic, mysterious, natural Bangla
-- Avoid: childish tone, generic boring sentence, fake overhype, emoji, hashtags
-- Main SEO focus: Bangla Bhuter Golpo, Horror Cartoon, Bengali Horror Cartoon, ভৌতিক গল্প
+- Goal: Website episode page, Google SEO
+- Tone: suspenseful, cinematic, mysterious
 
 Generate exactly these JSON keys:
 "description", "seoDescription", "seoTitle", "tags"
 
 Rules:
+1. description: 1-2 natural Bengali sentences. 25-45 words. Creates curiosity. No hashtags.
+2. seoDescription: 140-160 characters. Must include "Bangla Bhuter Golpo", "Horror Cartoon".
+3. seoTitle: Max 75 chars. Format: "Title | Bangla Bhuter Golpo | Rang Tuli"
+4. tags: 7-10 tags. Mix English and Bangla keywords.
 
-1. description:
-- This will show under episode card and inside website episode page.
-- Must be 1-2 natural Bengali sentences.
-- 25-45 Bengali words.
-- It must create curiosity and soft CTA.
-- It should make the viewer want to watch the full episode.
-- Do not use hashtags.
-- Do not use emoji.
-- Do not write generic lines like "রহস্যময় ও ভয়ংকর বাংলা হরর কার্টুন এপিসোড" only.
-- Do not keyword-stuff.
-- Good style example:
-  "শেষ রাতের নির্জন বাসস্ট্যান্ডে এক যাত্রীর অপেক্ষা ধীরে ধীরে ভয়ংকর অভিশাপে পরিণত হয়। অন্ধকার, রহস্য আর অজানা আতঙ্কে ভরা এই গল্পের শেষটা জানতে পুরো এপিসোড দেখুন।"
-
-2. seoDescription:
-- This is for Google meta description.
-- Must be 140-160 characters.
-- Must naturally include these keywords:
-  "Bangla Bhuter Golpo"
-  "Horror Cartoon"
-  "ভৌতিক গল্প"
-- Must sound natural, not keyword stuffing.
-- Must describe the episode and encourage watching.
-- No hashtags, no emoji.
-- Good style example:
-  "ভূতুড়ে বাসস্ট্যান্ড একটি Bangla Bhuter Golpo ও Horror Cartoon এপিসোড, যেখানে ভৌতিক গল্প, রহস্য আর ভয়ংকর রাতের ঘটনা দেখানো হয়েছে।"
-
-3. seoTitle:
-- Must be clickable and SEO-friendly.
-- Keep it between 50-70 characters if possible.
-- Maximum 75 characters.
-- Format:
-  "মূল গল্পের টাইটেল | Bangla Bhuter Golpo | Rang Tuli"
-- If the title becomes too long, shorten the main story title naturally.
-- Do not remove the keyword "Bangla Bhuter Golpo".
-- Do not make it look spammy.
-- Do not use hashtags or emoji.
-
-4. tags:
-- Give 7-10 tags.
-- Mix Bangla and English keywords.
-- Must include:
-  "Bangla Bhuter Golpo"
-  "Bangla Horror Cartoon"
-  "Bengali Horror Cartoon"
-  "Horror Cartoon"
-  "ভৌতিক গল্প"
-  "বাংলা ভূতের গল্প"
-- Add episode-specific tags from title.
-- Do not use hashtags.
-
-Output only valid JSON.
-Do not wrap with markdown.
-Do not add explanation.
+Output ONLY valid JSON.
 `;
 }
 
 function sanitizeAiData(data: any, title: string) {
   const fallback = makeSmartFallbackData(title);
 
-  const description =
-    typeof data?.description === "string"
-      ? limitText(data.description.replace(/#/g, "").trim(), 260)
-      : fallback.description;
-
-  const seoDescription =
-    typeof data?.seoDescription === "string"
-      ? limitText(data.seoDescription.replace(/#/g, "").trim(), 165)
-      : fallback.seoDescription;
-
-  const seoTitle =
-    typeof data?.seoTitle === "string"
-      ? limitText(data.seoTitle.replace(/#/g, "").trim(), 75)
-      : fallback.seoTitle;
-
-  const tags =
-    Array.isArray(data?.tags) && data.tags.length > 0
-      ? data.tags
-          .filter((tag: unknown) => typeof tag === "string")
-          .map((tag: string) => tag.replace(/#/g, "").trim())
-          .filter(Boolean)
-          .slice(0, 10)
+  const description = typeof data?.description === "string" ? limitText(data.description.replace(/#/g, "").trim(), 260) : fallback.description;
+  const seoDescription = typeof data?.seoDescription === "string" ? limitText(data.seoDescription.replace(/#/g, "").trim(), 165) : fallback.seoDescription;
+  const seoTitle = typeof data?.seoTitle === "string" ? limitText(data.seoTitle.replace(/#/g, "").trim(), 75) : fallback.seoTitle;
+  
+  const tags = Array.isArray(data?.tags) && data.tags.length > 0
+      ? data.tags.filter((tag: unknown) => typeof tag === "string").map((tag: string) => tag.replace(/#/g, "").trim()).filter(Boolean).slice(0, 10)
       : fallback.tags;
 
   return {
@@ -175,22 +108,33 @@ export async function generateAiEpisodeData(input: {
     const response = await ai.models.generateContent({
       model: "models/gemini-3.1-flash-lite",
       contents: getPrompt(input),
-      config: {
-        responseMimeType: "application/json",
-      },
+      config: { responseMimeType: "application/json" },
     });
 
-    const text = response.text?.trim();
+    let text = response.text?.trim();
 
     if (!text) {
+      console.log(`❌ [AI Error] জেমিনি কোনো উত্তর দেয়নি: ${input.title}`);
+      return makeSmartFallbackData(input.title);
+    }
+
+    // Bulletproof JSON Extractor (যেকোনো জায়গা থেকে শুধু JSON অংশটুকু বের করবে)
+    const startIndex = text.indexOf('{');
+    const endIndex = text.lastIndexOf('}');
+
+    if (startIndex !== -1 && endIndex !== -1) {
+      text = text.substring(startIndex, endIndex + 1);
+    } else {
+      console.log(`⚠️ [AI Format Error] JSON পাওয়া যায়নি: ${input.title} \nRaw text: ${text}`);
       return makeSmartFallbackData(input.title);
     }
 
     const parsedData = JSON.parse(text);
-
+    console.log(`✅ [AI Success] ডেটা সফলভাবে জেনারেট হয়েছে: ${input.title}`);
+    
     return sanitizeAiData(parsedData, input.title);
   } catch (error) {
-    console.error("Gemini description error:", error);
+    console.error(`🔥 [AI Catch Error] সমস্যা হয়েছে: ${input.title}`, error);
     return makeSmartFallbackData(input.title);
   }
 }

@@ -1,3 +1,4 @@
+export const revalidate = 60;
 import { Metadata } from "next";
 import { siteConfig } from "@/config/site";
 import Container from "@/components/ui/Container";

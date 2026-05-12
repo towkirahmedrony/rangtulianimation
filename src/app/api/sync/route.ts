@@ -367,7 +367,8 @@ export async function GET() {
     let aiRequestCount = 0;
     const MAX_AI_PER_REQUEST = 3;
 
-    for (const video of validVideos) {
+    const shuffledVideos = [...validVideos].sort(() => Math.random() - 0.5);
+    for (const video of shuffledVideos) {
       const canUseAi = aiRequestCount < MAX_AI_PER_REQUEST;
       const result = await processEpisode(video, canUseAi);
 
