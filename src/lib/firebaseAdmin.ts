@@ -1,30 +1,27 @@
-import admin from "firebase-admin";
+import * as admin from "firebase-admin";
+
+const formatPrivateKey = (key?: string) => {
+  if (!key) return undefined;
+  // Vercel-এ সেভ হওয়া টেক্সট \n কে আসল লাইন ব্রেকে কনভার্ট করা
+  return key.replace(/\\n/g, "\n");
+};
 
 if (!admin.apps.length) {
   try {
-    // লগ দিয়ে চেক করা (Vercel Logs-এ দেখা যাবে)
-    console.log("Checking Firebase Config...");
-    console.log("Project ID exists:", !!process.env.FIREBASE_PROJECT_ID);
-    console.log("Client Email exists:", !!process.env.FIREBASE_CLIENT_EMAIL);
-    console.log("Private Key exists:", !!process.env.FIREBASE_PRIVATE_KEY);
-
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey,
+        // প্রাইভেট কি ফরম্যাট করা হচ্ছে
+        privateKey: formatPrivateKey(process.env.FIREBASE_PRIVATE_KEY),
       }),
-      databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com`,
+      databaseURL: process.env.FIREBASE_DATABASE_URL,
     });
     console.log("✅ Firebase Admin Initialized Successfully");
-  } catch (error: any) {
-    console.error("❌ FIREBASE_AUTH_ERROR:", error.message);
-    if (error.message.includes("private_key")) {
-      console.error("🚨 চোর ধরা পড়েছে: আপনার Private Key-র ফরম্যাট ভুল!");
-    }
+  } catch (error) {
+    console.error("❌ Firebase Admin Initialization Error:", error);
   }
 }
 
 export const adminDb = admin.database();
+export const adminAuth = admin.auth();
