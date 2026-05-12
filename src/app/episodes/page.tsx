@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "রঙতুলি অ্যানিমেশনের সব ভিডিও এক জায়গায় দেখুন।",
 };
 
-export const revalidate = 60; // প্রতি ৬০ সেকেন্ডে ক্যাশ আপডেট
+export const revalidate = 60;
 
 async function getEpisodes(): Promise<Episode[]> {
   try {
@@ -22,15 +22,11 @@ async function getEpisodes(): Promise<Episode[]> {
       next: { revalidate: 60 },
     });
     
-    if (!res.ok) {
-      console.error("API response was not OK. Status:", res.status);
-      return [];
-    }
+    if (!res.ok) return [];
     
     const data = await res.json();
     return data.videos || [];
   } catch (error) {
-    console.error("Failed to fetch episodes:", error);
     return [];
   }
 }
@@ -39,28 +35,23 @@ export default async function EpisodesPage() {
   const videos = await getEpisodes();
 
   return (
-    <div className="py-10 md:py-20">
+    <div className="py-4 md:py-8"> {/* টপ প্যাডিং একদম কমিয়ে দেওয়া হলো */}
       <Container>
-        {/* Header Section with Integrated CTA */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-5xl font-bold mb-3 text-white">Episodes</h1>
-          <p className="text-slate-400 mb-6 max-w-2xl mx-auto">
+        {/* Episodes হেডিং রিমুভ করে শুধু ইউটিউব বাটন রাখা হলো */}
+        <div className="text-center mb-4 flex flex-col items-center justify-center space-y-3">
+          <p className="text-slate-400 text-sm md:text-base">
             রঙতুলি অ্যানিমেশনের সব ভিডিও এক জায়গায় দেখুন।
           </p>
-          
-          <div className="flex justify-center">
-            <CTAButton href={siteConfig.youtubePlaylistUrl} external variant="outline">
-              <MonitorPlay className="w-4 h-4 mr-2" /> Open Full Playlist on YouTube
-            </CTAButton>
-          </div>
+          <CTAButton href={siteConfig.youtubePlaylistUrl} external variant="outline">
+            <MonitorPlay className="w-4 h-4 mr-2" /> Open Full Playlist on YouTube
+          </CTAButton>
         </div>
 
-        {/* সার্চ এবং গ্রিড লিস্ট */}
         {videos.length > 0 ? (
           <EpisodesList initialVideos={videos} />
         ) : (
           <div className="max-w-4xl mx-auto text-center space-y-6 py-16">
-            <p className="text-slate-500 text-sm">ভিডিও লোড করা যাচ্ছে না। দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।</p>
+            <p className="text-slate-500 text-sm">ভিডিও লোড করা যাচ্ছে না।</p>
             <CTAButton href={siteConfig.youtubePlaylistUrl} external showIcon>
               View on YouTube
             </CTAButton>

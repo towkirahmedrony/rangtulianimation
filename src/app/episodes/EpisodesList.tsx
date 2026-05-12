@@ -8,7 +8,6 @@ import { Episode } from "@/types/youtube";
 export default function EpisodesList({ initialVideos }: { initialVideos: Episode[] }) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  // লাইভ ফিল্টারিং লজিক (টাইটেল, ডেসক্রিপশন বা ট্যাগ দিয়ে খুঁজবে)
   const filteredVideos = initialVideos.filter((video) => {
     const query = searchQuery.toLowerCase();
     return (
@@ -20,12 +19,10 @@ export default function EpisodesList({ initialVideos }: { initialVideos: Episode
 
   return (
     <div className="w-full">
-      {/* সার্চ বার */}
       <SearchBar onSearch={setSearchQuery} />
 
-      {/* ফিল্টার করা ভিডিওর গ্রিড */}
       {filteredVideos.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 mt-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 mt-4">
           {filteredVideos.map((video) => (
             <EpisodeCard 
               key={video.id} 
@@ -39,9 +36,9 @@ export default function EpisodesList({ initialVideos }: { initialVideos: Episode
           ))}
         </div>
       ) : (
-        <div className="max-w-3xl mx-auto text-center py-16 bg-zinc-900/30 rounded-2xl border border-zinc-800/50 mt-8">
+        <div className="max-w-3xl mx-auto text-center py-16 bg-zinc-900/30 rounded-2xl border border-zinc-800/50 mt-4">
           <p className="text-red-400 text-lg font-medium mb-2">কোনো ফলাফল পাওয়া যায়নি!</p>
-          <p className="text-slate-400">"{searchQuery}" এর জন্য কোনো ভৌতিক গল্প আমাদের আর্কাইভে নেই। অন্য কোনো শব্দ দিয়ে চেষ্টা করুন।</p>
+          <p className="text-slate-400">"{searchQuery}" এর জন্য কোনো ভৌতিক গল্প আমাদের আর্কাইভে নেই।</p>
         </div>
       )}
     </div>
