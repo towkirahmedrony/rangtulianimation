@@ -1,5 +1,6 @@
 import { adminDb } from "@/lib/firebaseAdmin";
 import { YouTubeApiResponse, Episode } from "@/types/youtube";
+import { YoutubeTranscript } from "youtube-transcript";
 
 export function createSlug(title: string) {
   return title
@@ -17,6 +18,17 @@ async function getSavedEpisode(videoId: string): Promise<Partial<Episode> | null
     return snapshot.val() as Partial<Episode>;
   } catch (error) {
     return null;
+  }
+}
+
+// নতুন ফাংশন: ইউটিউব থেকে সাবটাইটেল/ট্রান্সক্রিপ্ট নিয়ে আসার জন্য
+export async function getVideoTranscript(videoId: string): Promise<string> {
+  try {
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    return transcript.map((t) => t.text).join(" ");
+  } catch (error) {
+    console.error(`Transcript fetch failed for video ${videoId}:`, error);
+    return ""; // ফেইল করলে এম্পটি স্ট্রিং রিটার্ন করবে যাতে এআই ফলব্যাক নিতে পারে
   }
 }
 
@@ -79,7 +91,6 @@ export async function getLatestVideos(maxResults: number = 6): Promise<Episode[]
   if (!apiKey || !channelId) return [];
 
   try {
-    // playlistId এর পরিবর্তে সরাসরি channelId থেকে latest video নেওয়া হচ্ছে
     const url = new URL("https://www.googleapis.com/youtube/v3/search");
     url.searchParams.append("part", "snippet");
     url.searchParams.append("channelId", channelId);

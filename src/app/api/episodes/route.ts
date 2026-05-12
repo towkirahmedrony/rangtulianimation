@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { generateAiEpisodeData, makeSmartFallbackData } from "@/lib/aiDescription";
-import { createSlug } from "@/lib/youtube";
+import { createSlug, getVideoTranscript } from "@/lib/youtube"; // getVideoTranscript ইম্পোর্ট করা হলো
 
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
@@ -241,9 +241,13 @@ async function processEpisode(video: YouTubeVideoItem, canUseAi: boolean) {
     if (canUseAi) {
       console.log(`Generating AI data for: ${youtubeTitle}`);
 
+      // নতুন লজিক: AI জেনারেট করার আগে ট্রান্সক্রিপ্ট নিয়ে আসা
+      const transcriptText = await getVideoTranscript(videoId);
+
       aiData = await generateAiEpisodeData({
         title: savedData.title || youtubeTitle,
         youtubeDescription: originalDescription,
+        transcript: transcriptText, // ট্রান্সক্রিপ্ট পাস করা হলো
       });
 
       requestedAi = true;

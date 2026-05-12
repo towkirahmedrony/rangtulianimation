@@ -48,15 +48,18 @@ export function makeSmartFallbackData(title?: string) {
   };
 }
 
-function getPrompt(input: { title: string; youtubeDescription?: string }) {
+function getPrompt(input: { title: string; youtubeDescription?: string; transcript?: string }) {
   return `
 তুমি "Rang Tuli Animation Horror" নামের একটি Bengali horror cartoon YouTube channel-এর জন্য SEO-friendly episode metadata লিখবে।
 
 Video title:
 ${input.title}
 
-YouTube description:
+YouTube description (Ignore generic social links):
 ${input.youtubeDescription || ""}
+
+Video Transcript / Story Content (CRITICAL FOR STORY CONTEXT):
+${input.transcript || "No transcript available. Base the story mostly on the title."}
 
 Important context:
 - Channel type: Bengali / Bangla horror cartoon story
@@ -166,6 +169,7 @@ function sanitizeAiData(data: any, title: string) {
 export async function generateAiEpisodeData(input: {
   title: string;
   youtubeDescription?: string;
+  transcript?: string;
 }) {
   try {
     const response = await ai.models.generateContent({
