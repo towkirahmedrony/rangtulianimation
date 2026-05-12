@@ -3,8 +3,8 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { generateAiEpisodeData, makeSmartFallbackData } from "@/lib/aiDescription";
 import { createSlug, getVideoTranscript } from "@/lib/youtube"; // getVideoTranscript ইম্পোর্ট করা হলো
 
-export const revalidate = 0;
-export const dynamic = "force-dynamic";
+export const revalidate = 43200;
+// export const dynamic = "force-dynamic";
 
 type YouTubeSearchItem = {
   id: {
