@@ -20,6 +20,7 @@ export type Episode = {
 
   tags?: string[];
   originalDescription?: string;
+  isActive?: boolean;
 };
 
 export interface YouTubeApiResponse {
