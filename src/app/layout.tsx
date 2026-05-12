@@ -24,6 +24,10 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   keywords: [...siteConfig.keywords],
+  // গুগল সার্চ কনসোল ভেরিফিকেশন কোড এখানে যুক্ত করা হয়েছে
+  verification: {
+    google: "google699cbcc525196a33",
+  },
   openGraph: {
     title: "Rang Tuli Animation Horror | বাংলা হরর ও রহস্য অ্যানিমেশন",
     description: siteConfig.description,
