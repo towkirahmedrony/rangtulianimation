@@ -21,7 +21,30 @@ type YouTubeSearchItem = {
   };
 };
 
+type SavedEpisodeData = {
+  id?: string;
+  videoId?: string;
+  slug?: string;
+  title?: string;
+  description?: string;
+  seoDescription?: string;
+  seoTitle?: string;
+  tags?: string[];
+  isFallback?: boolean;
+  isActive?: boolean;
+  originalDescription?: string;
+  publishedAt?: string;
+  thumbnail?: string;
+  youtubeUrl?: string;
+  embedUrl?: string;
+  createdAt?: number;
+  updatedAt?: number;
+};
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const OLD_FALLBACK_TEXT =
+  "একটি বাংলা হরর কার্টুন গল্প, যেখানে অন্ধকার আর অজানা রহস্যের মুখোমুখি হতে হয়।";
 
 async function fetchYouTubeVideos(input: {
   apiKey: string;
@@ -56,6 +79,7 @@ function mergeUniqueVideos(items: YouTubeSearchItem[]) {
   for (const item of items) {
     const videoId = item.id.videoId;
     if (!videoId) continue;
+
     if (!map.has(videoId)) {
       map.set(videoId, item);
     }
@@ -64,80 +88,176 @@ function mergeUniqueVideos(items: YouTubeSearchItem[]) {
   return Array.from(map.values());
 }
 
+function hasUsefulText(value?: string) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isOldFallbackValue(value?: string) {
+  return Boolean(value && value.includes(OLD_FALLBACK_TEXT));
+}
+
+function shouldReplaceSavedField(savedData: SavedEpisodeData, value?: string) {
+  return !hasUsefulText(value) || savedData.isFallback === true || isOldFallbackValue(value);
+}
+
+function pickTextField(input: {
+  savedData: SavedEpisodeData;
+  savedValue?: string;
+  generatedValue?: string;
+  fallbackValue: string;
+}) {
+  const { savedData, savedValue, generatedValue, fallbackValue } = input;
+
+  if (!shouldReplaceSavedField(savedData, savedValue)) {
+    return savedValue!.trim();
+  }
+
+  return generatedValue || fallbackValue;
+}
+
+function pickTags(input: {
+  savedData: SavedEpisodeData;
+  savedTags?: string[];
+  generatedTags?: string[];
+  fallbackTags: string[];
+}) {
+  const { savedData, savedTags, generatedTags, fallbackTags } = input;
+
+  if (
+    Array.isArray(savedTags) &&
+    savedTags.length > 0 &&
+    savedData.isFallback !== true
+  ) {
+    return savedTags;
+  }
+
+  if (Array.isArray(generatedTags) && generatedTags.length > 0) {
+    return generatedTags;
+  }
+
+  return fallbackTags;
+}
+
+async function markInactiveEpisodes(activeVideoIds: Set<string>) {
+  const episodesRef = adminDb.ref("episodes");
+  const snapshot = await episodesRef.get();
+
+  if (!snapshot.exists()) return;
+
+  const updates: Record<string, unknown> = {};
+  const allEpisodes = snapshot.val() as Record<string, SavedEpisodeData>;
+  const now = Date.now();
+
+  for (const [videoId, episode] of Object.entries(allEpisodes)) {
+    const realVideoId = episode.videoId || episode.id || videoId;
+
+    if (!activeVideoIds.has(realVideoId) && episode.isActive !== false) {
+      updates[`${videoId}/isActive`] = false;
+      updates[`${videoId}/updatedAt`] = now;
+    }
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await episodesRef.update(updates);
+  }
+}
+
 async function processEpisode(item: YouTubeSearchItem, canUseAi: boolean) {
   const videoId = item.id.videoId;
   if (!videoId) return null;
 
-  const title = item.snippet.title;
+  const youtubeTitle = item.snippet.title;
   const originalDescription = item.snippet.description || "";
   const episodeRef = adminDb.ref(`episodes/${videoId}`);
   const snapshot = await episodeRef.get();
-  
-  const savedData = snapshot.exists() ? snapshot.val() : {};
 
-  // Check if data is missing or has the old fallback string
-  const isExistingFallback = savedData.isFallback === true || (savedData.seoDescription && savedData.seoDescription.includes("একটি বাংলা হরর কার্টুন গল্প, যেখানে অন্ধকার আর অজানা রহস্যের মুখোমুখি হতে হয়।"));
-  
-  const needsAi = 
-    !savedData.description || 
-    !savedData.seoDescription || 
-    !savedData.seoTitle || 
-    !savedData.tags ||
-    isExistingFallback;
+  const savedData = snapshot.exists() ? (snapshot.val() as SavedEpisodeData) : {};
 
-  let aiData = null;
+  const needsAi =
+    shouldReplaceSavedField(savedData, savedData.description) ||
+    shouldReplaceSavedField(savedData, savedData.seoDescription) ||
+    shouldReplaceSavedField(savedData, savedData.seoTitle) ||
+    !Array.isArray(savedData.tags) ||
+    savedData.tags.length === 0;
+
+  let aiData: ReturnType<typeof makeSmartFallbackData> | null = null;
   let requestedAi = false;
 
   if (needsAi) {
     if (canUseAi) {
-      console.log(`Generating AI data for: ${title}`);
+      console.log(`Generating AI data for: ${youtubeTitle}`);
+
       aiData = await generateAiEpisodeData({
-        title,
+        title: savedData.title || youtubeTitle,
         youtubeDescription: originalDescription,
       });
+
       requestedAi = true;
     } else {
-      // If we can't use AI in this cycle, use smart fallback without calling Gemini
-      aiData = makeSmartFallbackData(title);
+      aiData = makeSmartFallbackData(savedData.title || youtubeTitle);
     }
   }
 
+  const fallbackData = makeSmartFallbackData(savedData.title || youtubeTitle);
   const now = Date.now();
+
+  const title = savedData.title || youtubeTitle;
   const slug = savedData.slug || createSlug(title);
-  const useAiData = aiData && !aiData.isFallback;
 
   const episode = {
     id: videoId,
     videoId,
     slug,
-    title: savedData.title || title,
-    
-    description: useAiData ? aiData!.description : (savedData.description && !isExistingFallback ? savedData.description : (aiData?.description || savedData.description || "")),
-    seoDescription: useAiData ? aiData!.seoDescription : (savedData.seoDescription && !isExistingFallback ? savedData.seoDescription : (aiData?.seoDescription || savedData.seoDescription || "")),
-    seoTitle: useAiData ? aiData!.seoTitle : (savedData.seoTitle && !isExistingFallback ? savedData.seoTitle : (aiData?.seoTitle || savedData.seoTitle || `${title} | Rang Tuli Animation Horror`)),
-    tags: useAiData ? aiData!.tags : (savedData.tags && !isExistingFallback ? savedData.tags : (aiData?.tags || savedData.tags || ["Bangla Bhuter Golpo"])),
-    
-    isFallback: useAiData ? false : (aiData?.isFallback || savedData.isFallback || false),
+    title,
+
+    description: pickTextField({
+      savedData,
+      savedValue: savedData.description,
+      generatedValue: aiData?.description,
+      fallbackValue: fallbackData.description,
+    }),
+
+    seoDescription: pickTextField({
+      savedData,
+      savedValue: savedData.seoDescription,
+      generatedValue: aiData?.seoDescription,
+      fallbackValue: fallbackData.seoDescription,
+    }),
+
+    seoTitle: pickTextField({
+      savedData,
+      savedValue: savedData.seoTitle,
+      generatedValue: aiData?.seoTitle,
+      fallbackValue: fallbackData.seoTitle,
+    }),
+
+    tags: pickTags({
+      savedData,
+      savedTags: savedData.tags,
+      generatedTags: aiData?.tags,
+      fallbackTags: fallbackData.tags,
+    }),
+
+    isFallback: aiData?.isFallback ?? savedData.isFallback ?? false,
+    isActive: true,
 
     originalDescription: savedData.originalDescription || originalDescription,
     publishedAt: savedData.publishedAt || item.snippet.publishedAt,
+
     thumbnail:
       savedData.thumbnail ||
       item.snippet.thumbnails.high?.url ||
       item.snippet.thumbnails.medium?.url ||
       "",
-    
+
     youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
     embedUrl: `https://www.youtube.com/embed/${videoId}`,
-    
+
     createdAt: savedData.createdAt || now,
     updatedAt: now,
   };
 
-  // Only update DB if we successfully generated real AI data or if the DB had nothing at all
-  if (useAiData || !snapshot.exists()) {
-    await episodeRef.set(episode);
-  }
+  await episodeRef.set(episode);
 
   return { episode, requestedAi };
 }
@@ -155,36 +275,61 @@ export async function GET() {
     }
 
     const [latestItems, mostViewedItems] = await Promise.all([
-      fetchYouTubeVideos({ apiKey, channelId, order: "date", maxResults: 50 }),
-      fetchYouTubeVideos({ apiKey, channelId, order: "viewCount", maxResults: 10 }),
+      fetchYouTubeVideos({
+        apiKey,
+        channelId,
+        order: "date",
+        maxResults: 50,
+      }),
+      fetchYouTubeVideos({
+        apiKey,
+        channelId,
+        order: "viewCount",
+        maxResults: 10,
+      }),
     ]);
 
     const mergedItems = mergeUniqueVideos([...mostViewedItems, ...latestItems]);
+
+    const activeVideoIds = new Set(
+      mergedItems
+        .map((item) => item.id.videoId)
+        .filter((videoId): videoId is string => Boolean(videoId))
+    );
+
+    await markInactiveEpisodes(activeVideoIds);
+
     const episodes = [];
 
     let aiRequestCount = 0;
-    const MAX_AI_PER_REQUEST = 3; // এক রিকোয়েস্টে সর্বোচ্চ ৩টি ভিডিওর ডেসক্রিপশন জেনারেট হবে
+    const MAX_AI_PER_REQUEST = 3;
 
     for (const item of mergedItems) {
       const canUseAi = aiRequestCount < MAX_AI_PER_REQUEST;
       const result = await processEpisode(item, canUseAi);
-      
+
       if (result) {
         episodes.push(result.episode);
+
         if (result.requestedAi) {
           aiRequestCount++;
-          await delay(2000); // ছোট একটি delay
+          await delay(2000);
         }
       }
     }
 
-    episodes.sort(
-      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-    );
+    const activeEpisodes = episodes
+      .filter((episode) => activeVideoIds.has(episode.videoId))
+      .sort(
+        (a, b) =>
+          new Date(b.publishedAt).getTime() -
+          new Date(a.publishedAt).getTime()
+      );
 
-    return NextResponse.json({ videos: episodes });
+    return NextResponse.json({ videos: activeEpisodes });
   } catch (error) {
     console.error("Episodes API error:", error);
+
     return NextResponse.json(
       { error: "Something went wrong while loading episodes" },
       { status: 500 }
