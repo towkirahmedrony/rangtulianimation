@@ -4,23 +4,30 @@ import PopularEpisodeSection from "@/components/home/PopularEpisodeSection";
 import LatestEpisodesSection from "@/components/home/LatestEpisodesSection";
 import ContentFeaturesSection from "@/components/home/ContentFeaturesSection";
 import SubscribeSection from "@/components/home/SubscribeSection";
+import { Episode } from "@/types/youtube";
 
-export const revalidate = 60; // প্রতি ৬০ সেকেন্ডে ক্যাশ আপডেট হবে (কোটা বাঁচার জন্য বেস্ট)
+export const revalidate = 60;
 
-async function getHomeData() {
+// এখানে TypeScript কে বলে দেওয়া হলো রিটার্ন টাইপ কী হবে
+async function getHomeData(): Promise<{ mostViewed: Episode | null; latestVideos: Episode[] }> {
   try {
     const snapshot = await adminDb.ref("episodes").get();
     if (!snapshot.exists()) return { mostViewed: null, latestVideos: [] };
 
     const data = snapshot.val();
-    const allEpisodes = Object.values(data).filter((ep: any) => ep.isActive !== false);
+    // 'as Episode[]' দিয়ে নিশ্চিত করা হলো যে এটি এপিসোড টাইপের ডাটা
+    const allEpisodes = Object.values(data).filter((ep: any) => ep.isActive !== false) as Episode[];
 
-    // লেটেস্ট ৪টি ভিডিও (তারিখ অনুযায়ী সাজানো)
+    // লেটেস্ট ৪টি ভিডিও
     const latestVideos = [...allEpisodes]
-      .sort((a: any, b: any) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      .sort((a, b) => {
+        const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+        const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+        return dateB - dateA;
+      })
       .slice(0, 4);
 
-    // সবচেয়ে জনপ্রিয় ভিডিও (যদি ফায়ারবেসে views সেভ করা থাকে, নতুবা লেটেস্ট ভিডিওটাই দেখাবে)
+    // সবচেয়ে জনপ্রিয় ভিডিও
     const mostViewed = [...allEpisodes].sort((a: any, b: any) => {
       const viewsA = parseInt(a.views || "0");
       const viewsB = parseInt(b.views || "0");
