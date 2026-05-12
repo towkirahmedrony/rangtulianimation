@@ -10,6 +10,10 @@ type YouTubeSearchItem = {
   id: {
     videoId?: string;
   };
+};
+
+type YouTubeVideoItem = {
+  id: string;
   snippet: {
     title: string;
     description: string;
@@ -17,7 +21,20 @@ type YouTubeSearchItem = {
     thumbnails: {
       medium?: { url: string };
       high?: { url: string };
+      maxres?: { url: string };
     };
+    tags?: string[];
+  };
+  statistics?: {
+    viewCount?: string;
+  };
+  contentDetails?: {
+    duration?: string;
+  };
+  status?: {
+    privacyStatus?: string;
+    embeddable?: boolean;
+    uploadStatus?: string;
   };
 };
 
@@ -39,6 +56,8 @@ type SavedEpisodeData = {
   embedUrl?: string;
   createdAt?: number;
   updatedAt?: number;
+  viewCount?: number;
+  duration?: string;
 };
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -46,7 +65,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const OLD_FALLBACK_TEXT =
   "একটি বাংলা হরর কার্টুন গল্প, যেখানে অন্ধকার আর অজানা রহস্যের মুখোমুখি হতে হয়।";
 
-async function fetchYouTubeVideos(input: {
+async function fetchYouTubeSearchIds(input: {
   apiKey: string;
   channelId: string;
   order: "date" | "viewCount";
@@ -54,7 +73,7 @@ async function fetchYouTubeVideos(input: {
 }) {
   const youtubeUrl = new URL("https://www.googleapis.com/youtube/v3/search");
 
-  youtubeUrl.searchParams.set("part", "snippet");
+  youtubeUrl.searchParams.set("part", "id");
   youtubeUrl.searchParams.set("channelId", input.channelId);
   youtubeUrl.searchParams.set("maxResults", input.maxResults.toString());
   youtubeUrl.searchParams.set("order", input.order);
@@ -70,22 +89,52 @@ async function fetchYouTubeVideos(input: {
   }
 
   const data = await response.json();
-  return (data.items || []) as YouTubeSearchItem[];
+
+  return ((data.items || []) as YouTubeSearchItem[])
+    .map((item) => item.id.videoId)
+    .filter((videoId): videoId is string => Boolean(videoId));
 }
 
-function mergeUniqueVideos(items: YouTubeSearchItem[]) {
-  const map = new Map<string, YouTubeSearchItem>();
+async function fetchValidYouTubeVideos(input: {
+  apiKey: string;
+  videoIds: string[];
+}) {
+  if (input.videoIds.length === 0) return [];
 
-  for (const item of items) {
-    const videoId = item.id.videoId;
-    if (!videoId) continue;
+  const youtubeUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
 
-    if (!map.has(videoId)) {
-      map.set(videoId, item);
-    }
+  youtubeUrl.searchParams.set(
+    "part",
+    "snippet,contentDetails,statistics,status"
+  );
+  youtubeUrl.searchParams.set("id", input.videoIds.join(","));
+  youtubeUrl.searchParams.set("key", input.apiKey);
+
+  const response = await fetch(youtubeUrl.toString(), {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to verify YouTube videos");
   }
 
-  return Array.from(map.values());
+  const data = await response.json();
+  const videos = (data.items || []) as YouTubeVideoItem[];
+
+  return videos.filter((video) => {
+    const status = video.status;
+
+    return (
+      video.id &&
+      status?.privacyStatus === "public" &&
+      status?.embeddable !== false &&
+      status?.uploadStatus === "processed"
+    );
+  });
+}
+
+function uniqueIds(ids: string[]) {
+  return Array.from(new Set(ids));
 }
 
 function hasUsefulText(value?: string) {
@@ -117,22 +166,26 @@ function pickTextField(input: {
 
 function pickTags(input: {
   savedData: SavedEpisodeData;
-  savedTags?: string[];
+  youtubeTags?: string[];
   generatedTags?: string[];
   fallbackTags: string[];
 }) {
-  const { savedData, savedTags, generatedTags, fallbackTags } = input;
+  const { savedData, youtubeTags, generatedTags, fallbackTags } = input;
 
   if (
-    Array.isArray(savedTags) &&
-    savedTags.length > 0 &&
+    Array.isArray(savedData.tags) &&
+    savedData.tags.length > 0 &&
     savedData.isFallback !== true
   ) {
-    return savedTags;
+    return savedData.tags;
   }
 
   if (Array.isArray(generatedTags) && generatedTags.length > 0) {
     return generatedTags;
+  }
+
+  if (Array.isArray(youtubeTags) && youtubeTags.length > 0) {
+    return youtubeTags.slice(0, 10);
   }
 
   return fallbackTags;
@@ -148,12 +201,12 @@ async function markInactiveEpisodes(activeVideoIds: Set<string>) {
   const allEpisodes = snapshot.val() as Record<string, SavedEpisodeData>;
   const now = Date.now();
 
-  for (const [videoId, episode] of Object.entries(allEpisodes)) {
-    const realVideoId = episode.videoId || episode.id || videoId;
+  for (const [key, episode] of Object.entries(allEpisodes)) {
+    const realVideoId = episode.videoId || episode.id || key;
 
     if (!activeVideoIds.has(realVideoId) && episode.isActive !== false) {
-      updates[`${videoId}/isActive`] = false;
-      updates[`${videoId}/updatedAt`] = now;
+      updates[`${key}/isActive`] = false;
+      updates[`${key}/updatedAt`] = now;
     }
   }
 
@@ -162,12 +215,13 @@ async function markInactiveEpisodes(activeVideoIds: Set<string>) {
   }
 }
 
-async function processEpisode(item: YouTubeSearchItem, canUseAi: boolean) {
-  const videoId = item.id.videoId;
+async function processEpisode(video: YouTubeVideoItem, canUseAi: boolean) {
+  const videoId = video.id;
   if (!videoId) return null;
 
-  const youtubeTitle = item.snippet.title;
-  const originalDescription = item.snippet.description || "";
+  const youtubeTitle = video.snippet.title;
+  const originalDescription = video.snippet.description || "";
+
   const episodeRef = adminDb.ref(`episodes/${videoId}`);
   const snapshot = await episodeRef.get();
 
@@ -233,7 +287,7 @@ async function processEpisode(item: YouTubeSearchItem, canUseAi: boolean) {
 
     tags: pickTags({
       savedData,
-      savedTags: savedData.tags,
+      youtubeTags: video.snippet.tags,
       generatedTags: aiData?.tags,
       fallbackTags: fallbackData.tags,
     }),
@@ -242,13 +296,17 @@ async function processEpisode(item: YouTubeSearchItem, canUseAi: boolean) {
     isActive: true,
 
     originalDescription: savedData.originalDescription || originalDescription,
-    publishedAt: savedData.publishedAt || item.snippet.publishedAt,
+    publishedAt: savedData.publishedAt || video.snippet.publishedAt,
 
     thumbnail:
       savedData.thumbnail ||
-      item.snippet.thumbnails.high?.url ||
-      item.snippet.thumbnails.medium?.url ||
+      video.snippet.thumbnails.maxres?.url ||
+      video.snippet.thumbnails.high?.url ||
+      video.snippet.thumbnails.medium?.url ||
       "",
+
+    viewCount: Number(video.statistics?.viewCount || savedData.viewCount || 0),
+    duration: video.contentDetails?.duration || savedData.duration || "",
 
     youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
     embedUrl: `https://www.youtube.com/embed/${videoId}`,
@@ -274,14 +332,14 @@ export async function GET() {
       );
     }
 
-    const [latestItems, mostViewedItems] = await Promise.all([
-      fetchYouTubeVideos({
+    const [latestIds, mostViewedIds] = await Promise.all([
+      fetchYouTubeSearchIds({
         apiKey,
         channelId,
         order: "date",
         maxResults: 50,
       }),
-      fetchYouTubeVideos({
+      fetchYouTubeSearchIds({
         apiKey,
         channelId,
         order: "viewCount",
@@ -289,13 +347,14 @@ export async function GET() {
       }),
     ]);
 
-    const mergedItems = mergeUniqueVideos([...mostViewedItems, ...latestItems]);
+    const allVideoIds = uniqueIds([...mostViewedIds, ...latestIds]);
 
-    const activeVideoIds = new Set(
-      mergedItems
-        .map((item) => item.id.videoId)
-        .filter((videoId): videoId is string => Boolean(videoId))
-    );
+    const validVideos = await fetchValidYouTubeVideos({
+      apiKey,
+      videoIds: allVideoIds,
+    });
+
+    const activeVideoIds = new Set(validVideos.map((video) => video.id));
 
     await markInactiveEpisodes(activeVideoIds);
 
@@ -304,9 +363,9 @@ export async function GET() {
     let aiRequestCount = 0;
     const MAX_AI_PER_REQUEST = 3;
 
-    for (const item of mergedItems) {
+    for (const video of validVideos) {
       const canUseAi = aiRequestCount < MAX_AI_PER_REQUEST;
-      const result = await processEpisode(item, canUseAi);
+      const result = await processEpisode(video, canUseAi);
 
       if (result) {
         episodes.push(result.episode);
