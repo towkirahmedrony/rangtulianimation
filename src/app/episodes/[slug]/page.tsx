@@ -4,6 +4,11 @@ import { notFound } from "next/navigation";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { siteConfig } from "@/config/site";
 import { formatDate, formatNumber } from "@/lib/utils";
+import { getAllEpisodes } from "@/lib/youtube"; // সরাসরি ডাটাবেস ফাংশন ইমপোর্ট করা হলো
+
+// Next.js কে বলা হচ্ছে এই পেজটি যেন ক্যাশ না করে ডাইনামিকভাবে রেন্ডার হয়
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type Episode = {
   id?: string;
@@ -29,16 +34,6 @@ type PageProps = {
   }>;
 };
 
-function getBaseUrl() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL;
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return "http://localhost:3000";
-}
-
 function createSlug(text: string) {
   return text
     .toLowerCase()
@@ -61,46 +56,9 @@ function getYoutubeUrl(episode: Episode) {
   return episode.youtubeUrl || `https://www.youtube.com/watch?v=${videoId}`;
 }
 
-async function getEpisodes(): Promise<Episode[]> {
-  try {
-    const baseUrl = getBaseUrl();
-
-    console.log(`Fetching from: ${baseUrl}/api/episodes`);
-
-    const res = await fetch(`${baseUrl}/api/episodes`, {
-      next: {
-        revalidate: 3600,
-      },
-    });
-
-    if (!res.ok) {
-      console.error("API response was not OK in details page. Status:", res.status);
-      return [];
-    }
-
-    const data = await res.json();
-
-    if (Array.isArray(data)) {
-      return data;
-    }
-
-    if (Array.isArray(data.videos)) {
-      return data.videos;
-    }
-
-    if (Array.isArray(data.episodes)) {
-      return data.episodes;
-    }
-
-    return [];
-  } catch (error) {
-    console.error("Error fetching episodes in details page:", error);
-    return [];
-  }
-}
-
 async function getEpisodeBySlug(slug: string) {
-  const episodes = await getEpisodes();
+  // fetch এর বদলে সরাসরি ফাংশন কল
+  const episodes = await getAllEpisodes() as Episode[];
   const episode = episodes.find((item) => getEpisodeSlug(item) === slug);
 
   return {

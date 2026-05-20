@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       const PLAYLIST_ID = process.env.YOUTUBE_PLAYLIST_ID;
 
       if (!API_KEY || !PLAYLIST_ID) {
-        return NextResponse.json({ error: "YouTube API keys or Playlist ID missing in .env file" }, { status: 500 });
+        return NextResponse.json({ error: "YouTube API keys missing" }, { status: 500 });
       }
 
       let allYtItems: any[] = [];
@@ -36,15 +36,9 @@ export async function GET(request: Request) {
           { cache: "no-store" }
         );
         const ytData = await ytResponse.json();
-
-        // 🛑 Error Handling: ইউটিউব থেকে কোনো এরর আসলে সেটি স্ক্রিনে দেখাবে
+        
         if (ytData.error) {
-          console.error("YouTube API Error Details:", ytData.error);
-          return NextResponse.json({
-            error: "YouTube API Error",
-            message: ytData.error.message,
-            reason: ytData.error.errors?.[0]?.reason
-          }, { status: 500 });
+          return NextResponse.json({ error: "API Error", message: ytData.error.message }, { status: 500 });
         }
         
         if (ytData.items) {
@@ -54,11 +48,10 @@ export async function GET(request: Request) {
       } while (nextPageToken);
 
       if (allYtItems.length === 0) {
-        return NextResponse.json({ error: "No videos found in this playlist." }, { status: 404 });
+        return NextResponse.json({ error: "Failed to fetch videos" }, { status: 500 });
       }
 
       const activeYoutubeVideoIds = allYtItems.map((item: any) => item.snippet.resourceId.videoId);
-      
       const idChunks = chunkArray(activeYoutubeVideoIds, 50);
       const videoDetailsMap = new Map();
 
@@ -112,7 +105,7 @@ export async function GET(request: Request) {
           title: title,
           slug: createSlug(title),
           thumbnail: details.thumbnails?.high?.url || details.thumbnails?.default?.url || "",
-          publishedAt: details.publishedAt, 
+          publishedAt: details.publishedAt,
           youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
           embedUrl: `https://www.youtube.com/embed/${videoId}`,
           viewCount: details.viewCount,
@@ -129,9 +122,12 @@ export async function GET(request: Request) {
         }
 
         if (!isNewVideo) {
+           // 🎯 আপডেট লজিক: এখন থেকে টাইটেল এবং স্লাগও আপডেট হবে
            await episodesRef.child(videoId).update({ 
              viewCount: details.viewCount,
-             publishedAt: details.publishedAt 
+             publishedAt: details.publishedAt,
+             title: title,
+             slug: createSlug(title)
            });
         } else {
            await episodesRef.child(videoId).update(episodeData);
@@ -150,8 +146,8 @@ export async function GET(request: Request) {
     const videos = await getActiveEpisodesFromDB();
     return NextResponse.json({ videos });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("API Error:", error);
-    return NextResponse.json({ error: "Internal Server Error", details: error.message }, { status: 500 });
+    return NextResponse.json({ videos: [] }, { status: 500 });
   }
 }
