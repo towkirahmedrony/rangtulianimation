@@ -4,10 +4,9 @@ import { notFound } from "next/navigation";
 import VideoEmbed from "@/components/ui/VideoEmbed";
 import { siteConfig } from "@/config/site";
 import { formatDate, formatNumber } from "@/lib/utils";
-import { getAllEpisodes } from "@/lib/youtube"; // সরাসরি ডাটাবেস ফাংশন ইমপোর্ট করা হলো
+import { getAllEpisodes } from "@/lib/youtube";
 
-// Next.js কে বলা হচ্ছে এই পেজটি যেন ক্যাশ না করে ডাইনামিকভাবে রেন্ডার হয়
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Episode = {
@@ -43,6 +42,16 @@ function createSlug(text: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+function limitText(text: string, max = 160) {
+  const clean = text.replace(/\s+/g, " ").trim();
+
+  if (clean.length <= max) {
+    return clean;
+  }
+
+  return clean.slice(0, max - 1).trimEnd() + "…";
+}
+
 function getVideoId(episode: Episode) {
   return episode.youtubeId || episode.videoId || episode.id || "";
 }
@@ -56,10 +65,47 @@ function getYoutubeUrl(episode: Episode) {
   return episode.youtubeUrl || `https://www.youtube.com/watch?v=${videoId}`;
 }
 
-async function getEpisodeBySlug(slug: string) {
-  // fetch এর বদলে সরাসরি ফাংশন কল
-  const episodes = await getAllEpisodes() as Episode[];
-  const episode = episodes.find((item) => getEpisodeSlug(item) === slug);
+function getEpisodeSeoTitle(episode: Episode) {
+  return (
+    episode.seoTitle ||
+    `${episode.title} | Bangla Bhuter Golpo | Rang Tuli Animation Horror`
+  );
+}
+
+function getEpisodeMetaDescription(episode: Episode) {
+  return limitText(
+    episode.seoDescription ||
+      episode.description ||
+      `${episode.title} দেখুন Rang Tuli Animation Horror-এ। বাংলা ভূতের গল্প, suspense এবং Bengali horror cartoon animation।`,
+    160
+  );
+}
+
+function getEpisodeDisplayDescription(episode: Episode) {
+  return (
+    episode.description ||
+    episode.seoDescription ||
+    "Rang Tuli Animation Horror-এর এই বাংলা হরর কার্টুনে রয়েছে রহস্য, ভয় এবং suspense ভরা একটি ভূতের গল্প।"
+  );
+}
+
+function getEpisodeThumbnail(episode: Episode) {
+  const videoId = getVideoId(episode);
+
+  return (
+    episode.thumbnail ||
+    (videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : undefined)
+  );
+}
+
+async function getEpisodeBySlug(rawSlug: string) {
+  const episodes = (await getAllEpisodes()) as Episode[];
+  const decodedSlug = decodeURIComponent(rawSlug);
+
+  const episode = episodes.find(
+    (item) =>
+      getEpisodeSlug(item) === decodedSlug || getEpisodeSlug(item) === rawSlug
+  );
 
   return {
     episode,
@@ -67,7 +113,9 @@ async function getEpisodeBySlug(slug: string) {
   };
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const { episode } = await getEpisodeBySlug(slug);
 
@@ -77,23 +125,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const videoId = getVideoId(episode);
-  const title =
-    episode.seoTitle ||
-    `${episode.title} | Bangla Bhuter Golpo | Rang Tuli Animation Horror`;
-
-  const description =
-    episode.seoDescription ||
-    episode.description ||
-    `${episode.title} দেখুন Rang Tuli Animation Horror-এ। বাংলা ভূতের গল্প, suspense এবং Bengali horror cartoon animation।`;
-
-  const thumbnail =
-    episode.thumbnail ||
-    (videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : undefined);
+  const title = getEpisodeSeoTitle(episode);
+  const metaDescription = getEpisodeMetaDescription(episode);
+  const thumbnail = getEpisodeThumbnail(episode);
 
   return {
     title,
-    description,
+    description: metaDescription,
     keywords: [
       episode.title,
       "Bangla Bhuter Golpo",
@@ -105,7 +143,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ],
     openGraph: {
       title,
-      description,
+      description: metaDescription,
       type: "video.other",
       images: thumbnail
         ? [
@@ -121,7 +159,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     twitter: {
       card: "summary_large_image",
       title,
-      description,
+      description: metaDescription,
       images: thumbnail ? [thumbnail] : [],
     },
   };
@@ -138,11 +176,10 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
   const videoId = getVideoId(episode);
   const episodeSlug = getEpisodeSlug(episode);
   const youtubeUrl = getYoutubeUrl(episode);
+  const thumbnail = getEpisodeThumbnail(episode);
 
-  const description =
-    episode.seoDescription ||
-    episode.description ||
-    "Rang Tuli Animation Horror-এর এই বাংলা হরর কার্টুনে রয়েছে রহস্য, ভয় এবং suspense ভরা একটি ভূতের গল্প।";
+  const metaDescription = getEpisodeMetaDescription(episode);
+  const displayDescription = getEpisodeDisplayDescription(episode);
 
   const relatedEpisodes = episodes
     .filter((item) => getEpisodeSlug(item) !== episodeSlug)
@@ -154,10 +191,8 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
     "@context": "https://schema.org",
     "@type": "VideoObject",
     name: episode.title,
-    description,
-    thumbnailUrl:
-      episode.thumbnail ||
-      (videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : ""),
+    description: metaDescription,
+    thumbnailUrl: thumbnail || "",
     uploadDate:
       typeof publishedDate === "string"
         ? publishedDate
@@ -212,7 +247,7 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
               </h1>
 
               <p className="mt-4 text-base leading-7 text-slate-300">
-                {description}
+                {displayDescription}
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -244,7 +279,9 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
               <div className="mt-6 flex flex-wrap items-center gap-6 border-t border-white/10 pt-5 text-sm text-slate-400">
                 {publishedDate ? (
                   <p>
-                    <span className="font-semibold text-slate-200">Published:</span>{" "}
+                    <span className="font-semibold text-slate-200">
+                      Published:
+                    </span>{" "}
                     {formatDate(publishedDate.toString())}
                   </p>
                 ) : null}
@@ -256,19 +293,6 @@ export default async function EpisodeDetailsPage({ params }: PageProps) {
                   </p>
                 ) : null}
               </div>
-
-              {episode.tags && episode.tags.length > 0 ? (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {episode.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border border-slate-700/60 bg-slate-800/40 px-3 py-1.5 text-xs font-medium text-slate-300 shadow-sm backdrop-blur-sm transition-colors hover:bg-slate-700/80 hover:text-white"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
