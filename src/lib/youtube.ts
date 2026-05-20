@@ -11,7 +11,6 @@ export function createSlug(title: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-// সিঙ্ক রাউটের জন্য ট্রান্সক্রিপ্ট ফাংশন
 export async function getVideoTranscript(videoId: string): Promise<string> {
   try {
     const transcript = await YoutubeTranscript.fetchTranscript(videoId);
@@ -21,7 +20,6 @@ export async function getVideoTranscript(videoId: string): Promise<string> {
   }
 }
 
-// ফায়ারবেস থেকে ডেটা আনার কোর ফাংশন (ইউটিউব এপিআই বাদ!)
 export async function getActiveEpisodesFromDB(): Promise<Episode[]> {
   try {
     const snapshot = await adminDb.ref("episodes").get();
@@ -44,6 +42,7 @@ export async function getMostViewedVideo(): Promise<Episode | null> {
   return sortedByViews[0];
 }
 
+// হোমপেজের জন্য (লিমিটসহ)
 export async function getLatestVideos(maxResults: number = 6): Promise<Episode[]> {
   const episodes = await getActiveEpisodesFromDB();
   if (episodes.length === 0) return [];
@@ -53,5 +52,15 @@ export async function getLatestVideos(maxResults: number = 6): Promise<Episode[]
   return sortedByDate.slice(0, maxResults);
 }
 
-export const getYouTubeVideos = getLatestVideos;
-export const getChannelVideos = getLatestVideos;
+// এপিসোড পেজের জন্য (লিমিট ছাড়া সব ভিডিও)
+export async function getAllEpisodes(): Promise<Episode[]> {
+  const episodes = await getActiveEpisodesFromDB();
+  if (episodes.length === 0) return [];
+  return [...episodes].sort(
+    (a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime()
+  );
+}
+
+// Alias গুলো আপডেট করা হলো যেন এপিসোড পেজে সব ভিডিও যায়
+export const getYouTubeVideos = getAllEpisodes;
+export const getChannelVideos = getAllEpisodes;

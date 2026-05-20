@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { Episode } from "@/types/youtube";
 import { createSlug, getActiveEpisodesFromDB } from "@/lib/youtube";
+import { generateAiEpisodeData } from "@/lib/aiDescription";
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const chunkArray = (arr: any[], size: number) =>
+  Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
+    arr.slice(i * size, i * size + size)
+  );
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,71 +23,135 @@ export async function GET(request: Request) {
       const PLAYLIST_ID = process.env.YOUTUBE_PLAYLIST_ID;
 
       if (!API_KEY || !PLAYLIST_ID) {
-        return NextResponse.json({ error: "YouTube API keys missing" }, { status: 500 });
+        return NextResponse.json({ error: "YouTube API keys or Playlist ID missing in .env file" }, { status: 500 });
       }
 
-      // ইউটিউব থেকে লেটেস্ট ভিডিওগুলো আনা (একবারে ৫০টি)
-      const ytResponse = await fetch(
-        `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${PLAYLIST_ID}&key=${API_KEY}`,
-        { cache: "no-store" }
-      );
-      const ytData = await ytResponse.json();
+      let allYtItems: any[] = [];
+      let nextPageToken = "";
 
-      if (!ytData.items) {
-        return NextResponse.json({ error: "Failed to fetch from YouTube" }, { status: 500 });
+      do {
+        const pageTokenParam = nextPageToken ? `&pageToken=${nextPageToken}` : "";
+        const ytResponse = await fetch(
+          `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${PLAYLIST_ID}&key=${API_KEY}${pageTokenParam}`,
+          { cache: "no-store" }
+        );
+        const ytData = await ytResponse.json();
+
+        // 🛑 Error Handling: ইউটিউব থেকে কোনো এরর আসলে সেটি স্ক্রিনে দেখাবে
+        if (ytData.error) {
+          console.error("YouTube API Error Details:", ytData.error);
+          return NextResponse.json({
+            error: "YouTube API Error",
+            message: ytData.error.message,
+            reason: ytData.error.errors?.[0]?.reason
+          }, { status: 500 });
+        }
+        
+        if (ytData.items) {
+          allYtItems = allYtItems.concat(ytData.items);
+        }
+        nextPageToken = ytData.nextPageToken || "";
+      } while (nextPageToken);
+
+      if (allYtItems.length === 0) {
+        return NextResponse.json({ error: "No videos found in this playlist." }, { status: 404 });
       }
 
-      // ইউটিউবের বর্তমান ভিডিওগুলোর আইডি লিস্ট
-      const activeYoutubeVideoIds = ytData.items.map(
-        (item: any) => item.snippet.resourceId.videoId
-      );
+      const activeYoutubeVideoIds = allYtItems.map((item: any) => item.snippet.resourceId.videoId);
+      
+      const idChunks = chunkArray(activeYoutubeVideoIds, 50);
+      const videoDetailsMap = new Map();
 
+      for (const chunk of idChunks) {
+        const videoIdsString = chunk.join(',');
+        const detailsResponse = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${videoIdsString}&key=${API_KEY}`,
+          { cache: "no-store" }
+        );
+        const detailsData = await detailsResponse.json();
+        
+        if (detailsData.items) {
+          detailsData.items.forEach((item: any) => {
+            videoDetailsMap.set(item.id, {
+              viewCount: item.statistics?.viewCount || "0",
+              publishedAt: item.snippet?.publishedAt,
+              title: item.snippet?.title,
+              description: item.snippet?.description,
+              thumbnails: item.snippet?.thumbnails
+            });
+          });
+        }
+      }
+
+      const currentDbVideos = await getActiveEpisodesFromDB();
+      const existingVideoIds = currentDbVideos.map(v => v.videoId);
       const episodesRef = adminDb.ref("episodes");
       
-      // নতুন ভিডিও ফায়ারবেসে এড করা
-      for (const item of ytData.items) {
-        const videoId = item.snippet.resourceId.videoId;
-        const title = item.snippet.title;
-        
-        // Private বা Deleted ভিডিও ইগনোর করা
+      for (const videoId of activeYoutubeVideoIds) {
+        const details = videoDetailsMap.get(videoId);
+        if (!details) continue;
+
+        const title = details.title;
         if (title === "Private video" || title === "Deleted video") continue;
 
-        const episodeData: Episode = {
+        const isNewVideo = !existingVideoIds.includes(videoId);
+        let aiData = null;
+
+        if (isNewVideo) {
+          console.log(`New video detected: ${title}. Generating AI Data...`);
+          aiData = await generateAiEpisodeData({
+            title: title,
+            youtubeDescription: details.description,
+          });
+          await delay(5000); 
+        }
+
+        const episodeData: any = {
           id: videoId,
           videoId: videoId,
           title: title,
           slug: createSlug(title),
-          description: item.snippet.description,
-          thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url || "",
-          publishedAt: item.snippet.publishedAt,
+          thumbnail: details.thumbnails?.high?.url || details.thumbnails?.default?.url || "",
+          publishedAt: details.publishedAt, 
           youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
           embedUrl: `https://www.youtube.com/embed/${videoId}`,
+          viewCount: details.viewCount,
           isActive: true
         };
 
-        // ফায়ারবেসে ভিডিও আপডেট বা নতুন ইনসার্ট করা
-        await episodesRef.child(videoId).update(episodeData);
-      }
+        if (isNewVideo && aiData && !aiData.isFallback) {
+           episodeData.description = aiData.description; 
+           episodeData.seoDescription = aiData.seoDescription;
+           episodeData.seoTitle = aiData.seoTitle;
+           episodeData.tags = aiData.tags;
+        } else if (isNewVideo) {
+           episodeData.description = details.description;
+        }
 
-      // ফায়ারবেস থেকে ডিলিট হয়ে যাওয়া ভিডিও রিমুভ করা
-      const currentDbVideos = await getActiveEpisodesFromDB();
-      for (const dbVideo of currentDbVideos) {
-        if (!activeYoutubeVideoIds.includes(dbVideo.videoId)) {
-          // ভিডিওটি ইউটিউবে নেই, তাই ওয়েবসাইট থেকেও হাইড/ডিলিট করে দেওয়া হচ্ছে
-          await episodesRef.child(dbVideo.videoId).update({ isActive: false });
-          console.log(`Deactivated video: ${dbVideo.title}`);
+        if (!isNewVideo) {
+           await episodesRef.child(videoId).update({ 
+             viewCount: details.viewCount,
+             publishedAt: details.publishedAt 
+           });
+        } else {
+           await episodesRef.child(videoId).update(episodeData);
         }
       }
 
-      return NextResponse.json({ message: "Sync complete! Firebase updated." });
+      for (const dbVideo of currentDbVideos) {
+        if (!activeYoutubeVideoIds.includes(dbVideo.videoId)) {
+          await episodesRef.child(dbVideo.videoId).update({ isActive: false });
+        }
+      }
+
+      return NextResponse.json({ message: "Sync complete! Firebase updated perfectly." });
     }
 
-    // সাধারণ ওয়েবসাইটের ডাটা সাপ্লাই (অটোমেটিক)
     const videos = await getActiveEpisodesFromDB();
     return NextResponse.json({ videos });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("API Error:", error);
-    return NextResponse.json({ videos: [] }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error", details: error.message }, { status: 500 });
   }
 }
